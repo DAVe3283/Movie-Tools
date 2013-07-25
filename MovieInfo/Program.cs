@@ -2,8 +2,10 @@
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
+
+// I totally just rip off their sample code
 using DirectShowLib;
+using System.Runtime.InteropServices;
 
 namespace MovieInfo
 {
@@ -78,6 +80,9 @@ namespace MovieInfo
         /// </summary>
         public int Height = 0;
 
+        /// <summary>
+        /// Get the video quality
+        /// </summary>
         public VideoQuality Quality
         {
             get
@@ -148,7 +153,6 @@ namespace MovieInfo
             // Match things like "I'm A Moive! (2006) [PG-13] HD 1080p.mkv"
             Regex parser = new Regex(@"(^.+\((TV\s*)?\d{4}\)).*\.(mkv|avi)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
             Regex parserBetter = new Regex(@"(^.+\((TV\s*)?\d{4}\)).*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-            StreamWriter file = new StreamWriter(@"C:\Users\DAVe\Desktop\movies.csv");
 
             // Prepare to search
             DirectoryInfo movieDir = new DirectoryInfo(@"\\DAVe-Server-2\Movies");  // Where to search for movies
@@ -164,6 +168,7 @@ namespace MovieInfo
             ParseDirectory(movieDir, ref parserBetter, ref ignores, ref movies);
 
             // Make a new csv
+            StreamWriter file = new StreamWriter(@"C:\Users\DAVe\Desktop\movies.csv");
             file.WriteLine("\"Name\",\"Path\",\"Size\",\"Width\",\"Height\",\"Quality\",\"Added to Library\",\"Released in Theaters (may be wrong)\"");
 
             // Process the results
@@ -247,13 +252,13 @@ namespace MovieInfo
                         match.File = movie;
 
                         // Get movie metadata
+                        // (this is ripped right out of one of the DirectShowLib samples, because I am lazy)
                         IFilterGraph2 m_FilterGraph = new FilterGraph() as IFilterGraph2;
                         ICaptureGraphBuilder2 icgb2 = new CaptureGraphBuilder2() as ICaptureGraphBuilder2;
-                        int hr;
                         try
                         {
                             // Link the ICaptureGraphBuilder2 to the IFilterGraph2
-                            hr = icgb2.SetFiltergraph(m_FilterGraph);
+                            int hr = icgb2.SetFiltergraph(m_FilterGraph);
                             DsError.ThrowExceptionForHR(hr);
 
                             // Add the filters necessary to render the file.  This function will
@@ -288,6 +293,7 @@ namespace MovieInfo
                         }
                         finally
                         {
+                            // Cleanup COM objects
                             if (icgb2 != null)
                             {
                                 Marshal.ReleaseComObject(icgb2);
@@ -298,6 +304,12 @@ namespace MovieInfo
                                 Marshal.ReleaseComObject(m_FilterGraph);
                                 m_FilterGraph = null;
                             }
+
+                            // I hate this, but if you don't force a garbage
+                            // collection, none of the above released objects
+                            // actually get released (stupid COM). So, to avoid
+                            // horrible memory leaks, and possible DirectShow
+                            // object count limits, I force a garbage collect :/
                             GC.Collect();
                         }
 
@@ -340,15 +352,20 @@ namespace MovieInfo
             DsError.ThrowExceptionForHR(hr);
         }
 
-        // Get media size
+        /// <summary>
+        /// Get the size of the media, if possible
+        /// </summary>
+        /// <param name="sampGrabber">The sample grabber object to use</param>
+        /// <param name="width">The detected width (if any)</param>
+        /// <param name="height">The detected height (if any)</param>
         private static void GetSize(ISampleGrabber sampGrabber, out int width, out int height)
         {
+            // Initialize out values to 0 in case try fails
             width = 0;
             height = 0;
 
             // Get the media type from the SampleGrabber
             AMMediaType media = new AMMediaType();
-
             int hr = sampGrabber.GetConnectedMediaType(media);
             DsError.ThrowExceptionForHR(hr);
 
