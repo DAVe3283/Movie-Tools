@@ -310,9 +310,9 @@ namespace MovieInfo
                                 // Find movie files
                                 foreach (FileInfo trailer in trailers.GetFiles())
                                 {
-                                    if (movie.Name.EndsWith(".mkv", System.StringComparison.InvariantCultureIgnoreCase) ||
-                                        movie.Name.EndsWith(".mp4", System.StringComparison.InvariantCultureIgnoreCase) ||
-                                        movie.Name.EndsWith(".avi", System.StringComparison.InvariantCultureIgnoreCase))
+                                    if (trailer.Name.EndsWith(".mkv", System.StringComparison.InvariantCultureIgnoreCase) ||
+                                        trailer.Name.EndsWith(".mp4", System.StringComparison.InvariantCultureIgnoreCase) ||
+                                        trailer.Name.EndsWith(".avi", System.StringComparison.InvariantCultureIgnoreCase))
                                     {
                                         // We got a trailer!
                                         match.Trailers++;
