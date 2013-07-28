@@ -59,7 +59,7 @@ namespace MovieInfo
         }
 
         /// <summary>
-        /// The modification time of the movie.
+        /// Gets or sets the modification time of the movie.
         /// (This is usually when the movie was released in theaters.)
         /// </summary>
         public DateTime ModifiedTime
@@ -67,6 +67,10 @@ namespace MovieInfo
             get
             {
                 return File.LastWriteTime;
+            }
+            set
+            {
+                File.LastWriteTime = value;
             }
         }
 
@@ -155,6 +159,10 @@ namespace MovieInfo
     {
         static void Main(string[] args)
         {
+            // Allowable time drift (hours)
+            int allowedTimeError = 4;
+            bool fixFileTimesWithinError = true;
+
             // Match things like "I'm A Moive! (2006) [PG-13] HD 1080p.mkv"
             Regex parser = new Regex(@"(^.+\((TV\s*)?\d{4}\)).*\.(mkv|avi)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
             Regex parserBetter = new Regex(@"(^.+\((TV\s*)?\d{4}\)).*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -183,18 +191,43 @@ namespace MovieInfo
             int addedSinceStartTime = 0;
             foreach (Movie movie in movies)
             {
-                // See if the release date is reasonable
-                string releasedInTheaters = movie.ModifiedTime.ToShortDateString();
-                if ((movie.ModifiedTime.Subtract(new TimeSpan(1, 0, 0)) < movie.CreatedTime) &&
-                    (movie.ModifiedTime.Add(     new TimeSpan(1, 0, 0)) > movie.CreatedTime))
+                // Sanity check release date & time
+                string releasedInTheaters = string.Empty;
+                if ((movie.ModifiedTime.Minute == 0) &&
+                    (movie.ModifiedTime.Second == 0))
                 {
-                    // The release date is +/- 1 hour from the file creation date.
-                    // That means it is probably not real. Because I'm good, but not that good.
-                    releasedInTheaters = string.Empty;
+                    // If the release minute & second are 0, it is probably a real date
+                    // Now we just need to allow for time zones & DST
+                    TimeSpan lowErr = new TimeSpan(allowedTimeError, 0, 0);
+                    TimeSpan highErr = new TimeSpan(24 - allowedTimeError, 0, 0);
+                    TimeSpan err = TimeSpan.MaxValue;
+                    if (movie.ModifiedTime.TimeOfDay <= lowErr)
+                    {
+                        // Movie is slightly after midnight
+                        err = -movie.ModifiedTime.TimeOfDay;
+                    }
+                    else if (movie.ModifiedTime.TimeOfDay >= highErr)
+                    {
+                        // Movie is slightly before midnight
+                        err = new TimeSpan(24, 0, 0) - movie.ModifiedTime.TimeOfDay;
+                    }
+
+                    // Let's correct the movie's time
+                    if (err != TimeSpan.MaxValue)
+                    {
+                        DateTime releaseDate = movie.ModifiedTime.Add(err);
+                        releasedInTheaters = releaseDate.ToShortDateString();
+
+                        // Fix file time?
+                        if (!err.Equals(TimeSpan.Zero) && fixFileTimesWithinError)
+                        {
+                            movie.ModifiedTime = releaseDate;
+                        }
+                    }
                 }
 
                 // Write the CSV line
-                string movieCSV = string.Format("\"{0}\",\"{1}\",{2},{3},{4},\"{5}\",{6},\"{7}\",\"{8}\"", movie.Name, movie.Path, movie.Size, movie.Width, movie.Height, movie.Quality.ToString(), movie.Trailers.ToString(), movie.CreatedTime, movie.ModifiedTime);
+                string movieCSV = string.Format("\"{0}\",\"{1}\",{2},{3},{4},\"{5}\",{6},\"{7}\",\"{8}\"", movie.Name, movie.Path, movie.Size, movie.Width, movie.Height, movie.Quality.ToString(), movie.Trailers.ToString(), movie.CreatedTime, releasedInTheaters);
                 file.WriteLine(movieCSV);
 
                 // See if it is new
