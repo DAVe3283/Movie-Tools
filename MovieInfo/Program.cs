@@ -144,6 +144,11 @@ namespace MovieInfo
             /// </summary>
             HD_1080,
         }
+
+        /// <summary>
+        /// The number of trailers a movie appears to have
+        /// </summary>
+        public int Trailers = 0;
     }
 
     class Program
@@ -169,7 +174,7 @@ namespace MovieInfo
 
             // Make a new csv
             StreamWriter file = new StreamWriter(@"C:\Users\DAVe\Desktop\movies.csv");
-            file.WriteLine("\"Name\",\"Path\",\"Size\",\"Width\",\"Height\",\"Quality\",\"Added to Library\",\"Released in Theaters (may be wrong)\"");
+            file.WriteLine("\"Name\",\"Path\",\"Size\",\"Width\",\"Height\",\"Quality\",\"Trailers\",\"Added to Library\",\"Released in Theaters (may be wrong)\"");
 
             // Process the results
             System.DateTime startTime = System.DateTime.Now.AddDays(-7d);       // What movies to highlight as added recently
@@ -177,7 +182,7 @@ namespace MovieInfo
             foreach (Movie movie in movies)
             {
                 // Write the CSV line
-                string movieCSV = string.Format("\"{0}\",\"{1}\",{2},{3},{4},\"{5}\",\"{6}\",\"{7}\"", movie.Name, movie.Path, movie.Size, movie.Width, movie.Height, movie.Quality.ToString(), movie.CreatedTime, movie.ModifiedTime);
+                string movieCSV = string.Format("\"{0}\",\"{1}\",{2},{3},{4},\"{5}\",{6},\"{7}\",\"{8}\"", movie.Name, movie.Path, movie.Size, movie.Width, movie.Height, movie.Quality.ToString(), movie.Trailers.ToString(), movie.CreatedTime, movie.ModifiedTime);
                 file.WriteLine(movieCSV);
 
                 // See if it is new
@@ -250,6 +255,26 @@ namespace MovieInfo
                         Movie match = new Movie();
                         match.Name = name;
                         match.File = movie;
+
+                        // Do we have trailers?
+                        foreach (DirectoryInfo trailers in dir.GetDirectories())
+                        {
+                            // Look for a Trailers subdirectory
+                            if (trailers.Name.Equals("Trailers", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                // Find movie files
+                                foreach (FileInfo trailer in trailers.GetFiles())
+                                {
+                                    if (movie.Name.EndsWith(".mkv", System.StringComparison.InvariantCultureIgnoreCase) ||
+                                        movie.Name.EndsWith(".mp4", System.StringComparison.InvariantCultureIgnoreCase) ||
+                                        movie.Name.EndsWith(".avi", System.StringComparison.InvariantCultureIgnoreCase))
+                                    {
+                                        // We got a trailer!
+                                        match.Trailers++;
+                                    }
+                                }
+                            }
+                        }
 
                         // Get movie metadata
                         // (this is ripped right out of one of the DirectShowLib samples, because I am lazy)
