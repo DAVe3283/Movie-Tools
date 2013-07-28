@@ -174,13 +174,25 @@ namespace MovieInfo
 
             // Make a new csv
             StreamWriter file = new StreamWriter(@"C:\Users\DAVe\Desktop\movies.csv");
-            file.WriteLine("\"Name\",\"Path\",\"Size\",\"Width\",\"Height\",\"Quality\",\"Trailers\",\"Added to Library\",\"Released in Theaters (may be wrong)\"");
+            file.WriteLine("\"Name\",\"Path\",\"Size\",\"Width\",\"Height\",\"Quality\",\"Trailers\",\"Added to Library\",\"Released in Theaters\"");
+            // Tip: try setting the Size column's number format to:
+            // [>1000000000]0.00,,," GB";[>1000000]0.00,," MB";0.00," KB"
 
             // Process the results
             System.DateTime startTime = System.DateTime.Now.AddDays(-7d);       // What movies to highlight as added recently
             int addedSinceStartTime = 0;
             foreach (Movie movie in movies)
             {
+                // See if the release date is reasonable
+                string releasedInTheaters = movie.ModifiedTime.ToShortDateString();
+                if ((movie.ModifiedTime.Subtract(new TimeSpan(1, 0, 0)) < movie.CreatedTime) &&
+                    (movie.ModifiedTime.Add(     new TimeSpan(1, 0, 0)) > movie.CreatedTime))
+                {
+                    // The release date is +/- 1 hour from the file creation date.
+                    // That means it is probably not real. Because I'm good, but not that good.
+                    releasedInTheaters = string.Empty;
+                }
+
                 // Write the CSV line
                 string movieCSV = string.Format("\"{0}\",\"{1}\",{2},{3},{4},\"{5}\",{6},\"{7}\",\"{8}\"", movie.Name, movie.Path, movie.Size, movie.Width, movie.Height, movie.Quality.ToString(), movie.Trailers.ToString(), movie.CreatedTime, movie.ModifiedTime);
                 file.WriteLine(movieCSV);
