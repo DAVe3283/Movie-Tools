@@ -141,10 +141,10 @@ namespace MovieInfo
         }
 
         // Match things like "The Shawshank Redemption (1994) [R] HD 1080p.mkv"
-        private static Regex hd1080 = new Regex(@".*\s+HD\s+1080[pi]\..*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static Regex hd720 = new Regex(@".*\s+HD\s+720[pi]\..*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static Regex sdWidescreen = new Regex(@".*\s+Widescreen\..*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static Regex sdFullscreen = new Regex(@".*\s+Fullscreen\..*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex hd1080 = new Regex(@".*\bHD\s+1080[pi]\b.*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex hd720 = new Regex(@".*\bHD\s+720[pi]\b.*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex sdWidescreen = new Regex(@".*\bWidescreen\b.*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex sdFullscreen = new Regex(@".*\bFullscreen\b.*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         /// <summary>
         /// The quality of a video
