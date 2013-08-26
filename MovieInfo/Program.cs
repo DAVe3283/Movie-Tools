@@ -91,7 +91,29 @@ namespace MovieInfo
         {
             get
             {
-                if ((Width == 0) || (Height == 0))
+                // Try and grab it from the filename
+                // (I usually specify it, and aspect ratio detection is all
+                // sorts of borked on SD movies, because this plugin gets the
+                // NATIVE pixel resolution, not display resolution.)
+                if (hd1080.IsMatch(Path))
+                {
+                    return VideoQuality.HD_1080;
+                }
+                else if (hd720.IsMatch(Path))
+                {
+                    return VideoQuality.HD_720;
+                }
+                else if (sdWidescreen.IsMatch(Path))
+                {
+                    return VideoQuality.SD_Widescreen;
+                }
+                else if (sdFullscreen.IsMatch(Path))
+                {
+                    return VideoQuality.SD_Fullscreen;
+                }
+
+                // Well, we failed. Let's try and figure it out the hard way.
+                else if ((Width == 0) || (Height == 0))
                 {
                     return VideoQuality.Unknown;
                 }
@@ -106,7 +128,7 @@ namespace MovieInfo
                 else
                 {
                     double aspectRatio = (double)Width / (double)Height;
-                    if (aspectRatio > 1.6)                                      // 16:10 or wider
+                    if (aspectRatio >= 1.6)                                     // 16:10 or wider
                     {
                         return VideoQuality.SD_Widescreen;
                     }
@@ -117,6 +139,12 @@ namespace MovieInfo
                 }
             }
         }
+
+        // Match things like "The Shawshank Redemption (1994) [R] HD 1080p.mkv"
+        private static Regex hd1080 = new Regex(@".*\s+HD\s+1080[pi]\..*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex hd720 = new Regex(@".*\s+HD\s+720[pi]\..*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex sdWidescreen = new Regex(@".*\s+Widescreen\..*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex sdFullscreen = new Regex(@".*\s+Fullscreen\..*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         /// <summary>
         /// The quality of a video
@@ -157,14 +185,43 @@ namespace MovieInfo
 
     class Program
     {
+        /// <summary>
+        /// Valid file extensions for movie files
+        /// </summary>
+        public static string[] validExtensions = 
+        {
+            ".avi",
+            ".mkv",
+            ".mp4",
+        };
+
+        /// <summary>
+        /// Determines if a filename has a valid extension
+        /// (and is therefore likely to be a movie file)
+        /// </summary>
+        /// <param name="filename">The filename or path of the movie</param>
+        /// <returns>If the file is valid</returns>
+        public static bool hasValidExtension(string filename)
+        {
+            bool isValid = false;
+            foreach (string extension in validExtensions)
+            {
+                if (filename.EndsWith(extension, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    isValid = true;
+                    break;
+                }
+            }
+            return isValid;
+        }
+
         static void Main(string[] args)
         {
             // Allowable time drift (hours)
             int allowedTimeError = 4;
             bool fixFileTimesWithinError = true;
 
-            // Match things like "I'm A Moive! (2006) [PG-13] HD 1080p.mkv"
-            Regex parser = new Regex(@"(^.+\((TV\s*)?\d{4}\)).*\.(mkv|avi)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            // Match the movie folders (things like "I'm A Moive! (2006) [tmdbid=3283]"
             Regex parserBetter = new Regex(@"(^.+\((TV\s*)?\d{4}\)).*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
             // Prepare to search
@@ -292,9 +349,7 @@ namespace MovieInfo
                 // Get the actual file
                 foreach (FileInfo movie in dir.GetFiles())
                 {
-                    if (movie.Name.EndsWith(".mkv", System.StringComparison.InvariantCultureIgnoreCase) ||
-                        movie.Name.EndsWith(".mp4", System.StringComparison.InvariantCultureIgnoreCase) ||
-                        movie.Name.EndsWith(".avi", System.StringComparison.InvariantCultureIgnoreCase))
+                    if (hasValidExtension(movie.Name))
                     {
                         // We have a movie
                         Movie match = new Movie();
@@ -310,9 +365,7 @@ namespace MovieInfo
                                 // Find movie files
                                 foreach (FileInfo trailer in trailers.GetFiles())
                                 {
-                                    if (trailer.Name.EndsWith(".mkv", System.StringComparison.InvariantCultureIgnoreCase) ||
-                                        trailer.Name.EndsWith(".mp4", System.StringComparison.InvariantCultureIgnoreCase) ||
-                                        trailer.Name.EndsWith(".avi", System.StringComparison.InvariantCultureIgnoreCase))
+                                    if (hasValidExtension(trailer.Name))
                                     {
                                         // We got a trailer!
                                         match.Trailers++;
