@@ -77,12 +77,32 @@ namespace MovieInfo
         /// <summary>
         /// The width of the video frame (if it can be determined)
         /// </summary>
-        public int Width = 0;
+        public int Width
+        {
+            get
+            {
+                if (!haveAttributes)
+                {
+                    GetAttributes();
+                }
+                return width;
+            }
+        }
 
         /// <summary>
         /// The height of the video frame (if it can be determined)
         /// </summary>
-        public int Height = 0;
+        public int Height
+        {
+            get
+            {
+                if (!haveAttributes)
+                {
+                    GetAttributes();
+                }
+                return height;
+            }
+        }
 
         /// <summary>
         /// Get the video quality
@@ -112,30 +132,40 @@ namespace MovieInfo
                     return VideoQuality.SD_Fullscreen;
                 }
 
-                // Well, we failed. Let's try and figure it out the hard way.
-                else if ((Width == 0) || (Height == 0))
+                // Have we read attributes?
+                else if (haveAttributes)
                 {
-                    return VideoQuality.Unknown;
-                }
-                else if (Width > 1888)
-                {
-                    return VideoQuality.HD_1080;
-                }
-                else if (Width > 1248)
-                {
-                    return VideoQuality.HD_720;
-                }
-                else
-                {
-                    double aspectRatio = (double)Width / (double)Height;
-                    if (aspectRatio >= 1.6)                                     // 16:10 or wider
+                    // Use the attributes to figure it out the hard way
+                    if ((Width == 0) || (Height == 0))
                     {
-                        return VideoQuality.SD_Widescreen;
+                        return VideoQuality.Unknown;
+                    }
+                    else if (Width > 1888)
+                    {
+                        return VideoQuality.HD_1080;
+                    }
+                    else if (Width > 1248)
+                    {
+                        return VideoQuality.HD_720;
                     }
                     else
                     {
-                        return VideoQuality.SD_Fullscreen;
+                        double aspectRatio = (double)Width / (double)Height;
+                        if (aspectRatio >= 1.6)                                 // 16:10 or wider
+                        {
+                            return VideoQuality.SD_Widescreen;
+                        }
+                        else
+                        {
+                            return VideoQuality.SD_Fullscreen;
+                        }
                     }
+                }
+                else
+                {
+                    // We couldn't parse it from the name, and we haven't read
+                    // attributes, so we don't know.
+                    return VideoQuality.Unknown;
                 }
             }
         }
@@ -181,6 +211,31 @@ namespace MovieInfo
         /// The number of trailers a movie appears to have
         /// </summary>
         public int Trailers = 0;
+
+        /// <summary>
+        /// Do we have the movie attributes yet?
+        /// </summary>
+        private bool haveAttributes = false;
+
+        // Holds the attributes of the movie, if we read them
+        private int width;
+        private int height;
+
+        /// <summary>
+        /// Open the video file and get attributes (like width and height).
+        /// Warning: this can be SLOW.
+        /// </summary>
+        public void GetAttributes()
+        {
+            if (haveAttributes)
+            {
+                // Nothing to do
+                return;
+            }
+
+            Program.GetMovieAttributes(Path, out width, out height);
+            haveAttributes = true;
+        }
     }
 
     class Program
@@ -220,6 +275,7 @@ namespace MovieInfo
             // Allowable time drift (hours)
             int allowedTimeError = 4;
             bool fixFileTimesWithinError = true;
+            bool readAttributes = false;
 
             // Match the movie folders (things like "I'm A Moive! (2006) [tmdbid=3283]"
             Regex parserBetter = new Regex(@"(^.+\((TV\s*)?\d{4}\)).*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -235,17 +291,80 @@ namespace MovieInfo
             };
 
             // Get the moves
+            Console.WriteLine("Reading movie directory " + movieDir.FullName + "...");
             ParseDirectory(movieDir, ref parserBetter, ref ignores, ref movies);
+            Console.WriteLine("Completed reading movie directory.");
+            Console.WriteLine();
+
+            // Do we want the width and height?
+            Console.WriteLine("Do you want to read the width & height of each movie?");
+            Console.WriteLine("-- This is very slow! --");
+            Console.Write("Read attributes (Y/N)? [");
+            Console.Write(readAttributes ? "Y" : "N");
+            Console.Write("] ");
+            do
+            {
+                ConsoleKeyInfo keyPressed = Console.ReadKey(true);              // Don't show the key press
+                if (keyPressed.Key == ConsoleKey.Y)
+                {
+                    readAttributes = true;
+                    break;
+                }
+                else if (keyPressed.Key == ConsoleKey.N)
+                {
+                    readAttributes = false;
+                    break;
+                }
+                else if (keyPressed.Key == ConsoleKey.Enter)
+                {
+                    // Leave default
+                    break;
+                }
+            } while (true);
+            Console.WriteLine();
+            Console.WriteLine();
+
+            // Do we want to fix time error?
+            Console.WriteLine("Do you want to fix time offset error on each movie?");
+            Console.WriteLine("-- Only movies within ±" + allowedTimeError.ToString() + " hour(s) of midnight will be fixed. --");
+            Console.WriteLine("-- This is usually harmless, and very fast --");
+            Console.Write("Correct time error (Y/N)? [");
+            Console.Write(fixFileTimesWithinError ? "Y" : "N");
+            Console.Write("] ");
+            do
+            {
+                ConsoleKeyInfo keyPressed = Console.ReadKey(true);              // Don't show the key press
+                if (keyPressed.Key == ConsoleKey.Y)
+                {
+                    fixFileTimesWithinError = true;
+                    break;
+                }
+                else if (keyPressed.Key == ConsoleKey.N)
+                {
+                    fixFileTimesWithinError = false;
+                    break;
+                }
+                else if (keyPressed.Key == ConsoleKey.Enter)
+                {
+                    // Leave default
+                    break;
+                }
+            } while (true);
+            Console.WriteLine();
+            Console.WriteLine();
 
             // Make a new csv
             StreamWriter file = new StreamWriter(@"C:\Users\DAVe\Desktop\movies.csv");
-            file.WriteLine("\"Name\",\"Path\",\"Size\",\"Width\",\"Height\",\"Quality\",\"Trailers\",\"Added to Library\",\"Released in Theaters\"");
+            file.WriteLine("\"Name\",\"Path\",\"Size\"," +
+                (readAttributes ? "\"Width\",\"Height\"," : string.Empty) +
+                "\"Quality\",\"Trailers\",\"Added to Library\",\"Released in Theaters\"");
             // Tip: try setting the Size column's number format to:
             // [>1000000000]0.00,,," GB";[>1000000]0.00,," MB";0.00," KB"
 
             // Process the results
             System.DateTime startTime = System.DateTime.Now.AddDays(-7d);       // What movies to highlight as added recently
             int addedSinceStartTime = 0;
+            int timeErrors = 0;
             foreach (Movie movie in movies)
             {
                 // Sanity check release date & time
@@ -276,22 +395,35 @@ namespace MovieInfo
                         releasedInTheaters = releaseDate.ToShortDateString();
 
                         // Fix file time?
-                        if (!err.Equals(TimeSpan.Zero) && fixFileTimesWithinError)
+                        if (!err.Equals(TimeSpan.Zero))
                         {
-                            movie.ModifiedTime = releaseDate;
+                            ++timeErrors;
+                            if (fixFileTimesWithinError)
+                            {
+                                movie.ModifiedTime = releaseDate;
+                                Console.WriteLine("Fixed time error of " + err.ToString() + " on " + movie.Name);
+                            }
                         }
                     }
                 }
 
                 // Write the CSV line
-                string movieCSV = string.Format("\"{0}\",\"{1}\",{2},{3},{4},\"{5}\",{6},\"{7}\",\"{8}\"", movie.Name, movie.Path, movie.Size, movie.Width, movie.Height, movie.Quality.ToString(), movie.Trailers.ToString(), movie.CreatedTime, releasedInTheaters);
+                string movieCSV;
+                if (readAttributes)
+                {
+                    movieCSV = string.Format("\"{0}\",\"{1}\",{2},{3},{4},\"{5}\",{6},\"{7}\",\"{8}\"", movie.Name, movie.Path, movie.Size, movie.Width, movie.Height, movie.Quality.ToString(), movie.Trailers.ToString(), movie.CreatedTime, releasedInTheaters);
+                }
+                else
+                {
+                    movieCSV = string.Format("\"{0}\",\"{1}\",{2},\"{3}\",{4},\"{5}\",\"{6}\"", movie.Name, movie.Path, movie.Size, movie.Quality.ToString(), movie.Trailers.ToString(), movie.CreatedTime, releasedInTheaters);
+                }
                 file.WriteLine(movieCSV);
 
                 // See if it is new
                 if (movie.CreatedTime >= startTime)
                 {
                     ++addedSinceStartTime;
-                    System.Console.Out.WriteLine("Added recently: " + movie.Name);
+                    Console.Out.WriteLine("Added recently: " + movie.Name);
                 }
             }
 
@@ -300,11 +432,12 @@ namespace MovieInfo
             file.Dispose();
 
             // Finish
-            System.Console.WriteLine();
-            System.Console.Out.WriteLine("Found " + movies.Count.ToString() + " movies.");
-            System.Console.Out.WriteLine(addedSinceStartTime.ToString() + " were added since " + startTime.ToString());
-            System.Console.Out.WriteLine("Press any key to quit.");
-            System.Console.ReadKey();
+            Console.WriteLine();
+            Console.Out.WriteLine("Found " + movies.Count.ToString() + " movies.");
+            Console.Out.WriteLine(addedSinceStartTime.ToString() + " movie(s) added since " + startTime.ToString());
+            Console.Out.WriteLine(timeErrors + " movie(s) " + (fixFileTimesWithinError ? "had" : "have") + " time errors that were " + (fixFileTimesWithinError ? string.Empty : "NOT ") + "fixed.");
+            Console.Out.WriteLine("Press any key to quit.");
+            Console.ReadKey();
         }
 
         /// <summary>
@@ -374,68 +507,6 @@ namespace MovieInfo
                             }
                         }
 
-                        // Get movie metadata
-                        // (this is ripped right out of one of the DirectShowLib samples, because I am lazy)
-                        IFilterGraph2 m_FilterGraph = new FilterGraph() as IFilterGraph2;
-                        ICaptureGraphBuilder2 icgb2 = new CaptureGraphBuilder2() as ICaptureGraphBuilder2;
-                        try
-                        {
-                            // Link the ICaptureGraphBuilder2 to the IFilterGraph2
-                            int hr = icgb2.SetFiltergraph(m_FilterGraph);
-                            DsError.ThrowExceptionForHR(hr);
-
-                            // Add the filters necessary to render the file.  This function will
-                            // work with a number of different file types.
-                            IBaseFilter sourceFilter = null;
-                            hr = m_FilterGraph.AddSourceFilter(match.Path, match.Path, out sourceFilter);
-                            DsError.ThrowExceptionForHR(hr);
-
-                            // Get the SampleGrabber interface
-                            ISampleGrabber m_sampGrabber = (ISampleGrabber)new SampleGrabber();
-                            IBaseFilter baseGrabFlt = (IBaseFilter)m_sampGrabber;
-
-                            // Configure the Sample Grabber
-                            ConfigureSampleGrabber(m_sampGrabber);
-
-                            // Add it to the filter
-                            hr = m_FilterGraph.AddFilter(baseGrabFlt, "Ds.NET Grabber");
-                            DsError.ThrowExceptionForHR(hr);
-
-                            // Connect the pieces together, use the default renderer
-                            hr = icgb2.RenderStream(null, null, sourceFilter, baseGrabFlt, null);
-                            DsError.ThrowExceptionForHR(hr);
-
-                            // Get video size
-                            GetSize(m_sampGrabber, out match.Width, out match.Height);
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Console.Error.Write("Error getting video metadata for ");
-                            System.Console.Error.WriteLine(match.Name + ":");
-                            System.Console.Error.WriteLine(ex.Message);
-                        }
-                        finally
-                        {
-                            // Cleanup COM objects
-                            if (icgb2 != null)
-                            {
-                                Marshal.ReleaseComObject(icgb2);
-                                icgb2 = null;
-                            }
-                            if (m_FilterGraph != null)
-                            {
-                                Marshal.ReleaseComObject(m_FilterGraph);
-                                m_FilterGraph = null;
-                            }
-
-                            // I hate this, but if you don't force a garbage
-                            // collection, none of the above released objects
-                            // actually get released (stupid COM). So, to avoid
-                            // horrible memory leaks, and possible DirectShow
-                            // object count limits, I force a garbage collect :/
-                            GC.Collect();
-                        }
-
                         // Done
                         movies.Add(match);
                         return;
@@ -450,6 +521,78 @@ namespace MovieInfo
             {
                 System.Console.Out.Write("Ignored ");
                 System.Console.Out.WriteLine(dir.FullName);
+            }
+        }
+
+        /// <summary>
+        /// Gets the movie height/width
+        /// </summary>
+        public static void GetMovieAttributes(string path, out int width, out int height)
+        {
+            // Initialize out parameters
+            width = 0;
+            height = 0;
+
+            // Get movie metadata
+            // (this is ripped right out of one of the DirectShowLib samples, because I am lazy)
+            IFilterGraph2 m_FilterGraph = new FilterGraph() as IFilterGraph2;
+            ICaptureGraphBuilder2 icgb2 = new CaptureGraphBuilder2() as ICaptureGraphBuilder2;
+            try
+            {
+                // Link the ICaptureGraphBuilder2 to the IFilterGraph2
+                int hr = icgb2.SetFiltergraph(m_FilterGraph);
+                DsError.ThrowExceptionForHR(hr);
+
+                // Add the filters necessary to render the file.  This function will
+                // work with a number of different file types.
+                IBaseFilter sourceFilter = null;
+                hr = m_FilterGraph.AddSourceFilter(path, path, out sourceFilter);
+                DsError.ThrowExceptionForHR(hr);
+
+                // Get the SampleGrabber interface
+                ISampleGrabber m_sampGrabber = (ISampleGrabber)new SampleGrabber();
+                IBaseFilter baseGrabFlt = (IBaseFilter)m_sampGrabber;
+
+                // Configure the Sample Grabber
+                ConfigureSampleGrabber(m_sampGrabber);
+
+                // Add it to the filter
+                hr = m_FilterGraph.AddFilter(baseGrabFlt, "Ds.NET Grabber");
+                DsError.ThrowExceptionForHR(hr);
+
+                // Connect the pieces together, use the default renderer
+                hr = icgb2.RenderStream(null, null, sourceFilter, baseGrabFlt, null);
+                DsError.ThrowExceptionForHR(hr);
+
+                // Get video size
+                GetSize(m_sampGrabber, out width, out height);
+            }
+            catch (Exception ex)
+            {
+                System.Console.Error.Write("Error getting video metadata for ");
+                System.Console.Error.WriteLine(path + ":");
+                System.Console.Error.WriteLine(ex.Message);
+            }
+            finally
+            {
+                // Cleanup COM objects
+                if (icgb2 != null)
+                {
+                    Marshal.ReleaseComObject(icgb2);
+                    icgb2 = null;
+                }
+                if (m_FilterGraph != null)
+                {
+                    Marshal.ReleaseComObject(m_FilterGraph);
+                    m_FilterGraph = null;
+                }
+
+                // I hate this, but if you don't force a garbage
+                // collection, none of the above released objects
+                // actually get released (stupid COM). So, to avoid
+                // horrible memory leaks, and possible DirectShow
+                // object count limits, I force a garbage collect :/
+                GC.Collect();
             }
         }
 
