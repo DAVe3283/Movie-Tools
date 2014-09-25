@@ -170,7 +170,7 @@ namespace MovieInfo
             }
         }
 
-        // Match things like "The Shawshank Redemption (1994) [R] HD 1080p.mkv"
+        // Match video quality in filenames like "The Shawshank Redemption (1994) [R] HD 1080p.mkv"
         private static Regex hd1080 = new Regex(@".*\bHD\s+1080[pi]\b.*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static Regex hd720 = new Regex(@".*\bHD\s+720[pi]\b.*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static Regex sdWidescreen = new Regex(@".*\bWidescreen\b.*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -208,9 +208,147 @@ namespace MovieInfo
         }
 
         /// <summary>
+        /// Get the MPAA Rating of the file
+        /// </summary>
+        public MpaaRating Rating
+        {
+            get
+            {
+                // Test in order from most to least offensive, in case a path is misleading
+                // (better to err on the side of caution)
+                if (ratingUnrated.IsMatch(Path))
+                {
+                    return MpaaRating.Unrated;
+                }
+                else if (ratingG.IsMatch(Path))
+                {
+                    return MpaaRating.G;
+                }
+                else if (ratingPG.IsMatch(Path))
+                {
+                    return MpaaRating.PG;
+                }
+                else if (ratingPG13.IsMatch(Path))
+                {
+                    return MpaaRating.PG13;
+                }
+                else if (ratingR.IsMatch(Path))
+                {
+                    return MpaaRating.R;
+                }
+                else if (ratingNC17.IsMatch(Path))
+                {
+                    return MpaaRating.NC17;
+                }
+                else if (ratingApproved.IsMatch(Path))
+                {
+                    return MpaaRating.Approved;
+                }
+                else
+                {
+                    return MpaaRating.Unknown;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Get the raw rating string for the movie
+        /// </summary>
+        public string RatingString
+        {
+            get
+            {
+                MatchCollection matches = appearsToHaveRating.Matches(Path);
+                if (matches.Count >= 1)
+                {
+                    return matches[0].Groups[1].Value;
+                }
+                else
+                {
+                    return string.Empty;
+                }
+            }
+        }
+
+        // Match MPAA rating in filenames like "RED (2010) [PG-13] HD 1080p.mkv"
+        private static Regex appearsToHaveRating = new Regex(@".*\s+\[([\w\-]{1,8})\]\s.*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex ratingUnrated = new Regex(@"\[(UR|Unrated)\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex ratingG = new Regex(@"\[G\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex ratingPG = new Regex(@"\[PG\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex ratingPG13 = new Regex(@"\[PG\-?13\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex ratingR = new Regex(@"\[R\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex ratingNC17 = new Regex(@"\[NC\-?17\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex ratingApproved = new Regex(@"\[Approved\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        /// <summary>
+        /// The MPAA Film Rating of a movie
+        /// </summary>
+        public enum MpaaRating
+        {
+            /// <summary>
+            /// Cannot determine movie rating (not in filename, or invalid rating text)
+            /// </summary>
+            Unknown,
+
+            /// <summary>
+            /// Not rated by the MPAA (i.e. older movies and director's cuts)
+            /// </summary>
+            Unrated,
+
+            /// <summary>
+            /// General Audiences
+            /// </summary>
+            G,
+
+            /// <summary>
+            /// Parental Guidance Suggested
+            /// </summary>
+            PG,
+
+            /// <summary>
+            /// Parents Strongly Cautioned
+            /// </summary>
+            PG13,
+
+            /// <summary>
+            /// Restricted
+            /// </summary>
+            R,
+
+            /// <summary>
+            /// No One 17 And Under Admitted
+            /// </summary>
+            NC17,
+
+            /// <summary>
+            /// Pre-1968 titles only
+            /// (from the MPAA site: "Under the Hays Code, films were simply approved or disapproved based on whether they were deemed 'moral' or 'immoral'.")
+            /// </summary>
+            Approved,
+        }
+
+        /// <summary>
         /// The number of trailers a movie appears to have
         /// </summary>
         public int Trailers = 0;
+
+        private static Regex hasAVS = new Regex(@"\[AVS\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        /// <summary>
+        /// Does the movie have an Alternate Video Stream?
+        /// </summary>
+        public bool AVS
+        {
+            get
+            {
+                return hasAVS.IsMatch(Path);
+            }
+        }
+
+        /// <summary>
+        /// Does the movie appear to have a MBMovie.json file?
+        /// </summary>
+        public bool hasJson = false;
 
         /// <summary>
         /// Do we have the movie attributes yet?
@@ -248,6 +386,7 @@ namespace MovieInfo
             ".avi",
             ".mkv",
             ".mp4",
+            ".wmv",
         };
 
         /// <summary>
@@ -281,7 +420,7 @@ namespace MovieInfo
             Regex parserBetter = new Regex(@"(^.+\((TV\s*)?\d{4}\)).*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
             // Prepare to search
-            DirectoryInfo movieDir = new DirectoryInfo(@"\\DAVe-Server-2\Movies");  // Where to search for movies
+            DirectoryInfo movieDir = new DirectoryInfo(@"\\Legion\Movies");     // Where to search for movies
             List<Movie> movies = new List<Movie>();                             // Holds the matched movies
             string[] ignores =                                                  // A list of folders to ignore
             {
@@ -354,12 +493,14 @@ namespace MovieInfo
             Console.WriteLine();
 
             // Make a new csv
-            StreamWriter file = new StreamWriter(@"C:\Users\DAVe\Desktop\movies.csv");
+            StreamWriter file = new StreamWriter("C:\\Users\\DAVe\\Google Drive\\Movie List\\movies " + DateTime.Now.ToShortDateString() + ".csv");
             file.WriteLine("\"Name\",\"Path\",\"Size\"," +
                 (readAttributes ? "\"Width\",\"Height\"," : string.Empty) +
-                "\"Quality\",\"Trailers\",\"Added to Library\",\"Released in Theaters\"");
+                "\"Quality\",\"Rating\",\"Trailers\",\"AVS\",\"Added to Library\",\"Released in Theaters\"");
             // Tip: try setting the Size column's number format to:
             // [>1000000000]0.00,,," GB";[>1000000]0.00,," MB";0.00," KB"
+            // or since most movies are ≫ 1 MB
+            // [>1000000000000]0.000,,,," TB";[>1000000000]0.00,,," GB";0.00,," MB"
 
             // Process the results
             System.DateTime startTime = System.DateTime.Now.AddDays(-7d);       // What movies to highlight as added recently
@@ -411,11 +552,15 @@ namespace MovieInfo
                 string movieCSV;
                 if (readAttributes)
                 {
-                    movieCSV = string.Format("\"{0}\",\"{1}\",{2},{3},{4},\"{5}\",{6},\"{7}\",\"{8}\"", movie.Name, movie.Path, movie.Size, movie.Width, movie.Height, movie.Quality.ToString(), movie.Trailers.ToString(), movie.CreatedTime, releasedInTheaters);
+                    movieCSV = string.Format(
+                        "\"{0}\",\"{1}\",{2},{3},{4},\"{5}\",\"{6}\",{7},\"{8}\",\"{9}\",\"{10}\"",
+                        movie.Name, movie.Path, movie.Size, movie.Width, movie.Height, movie.Quality.ToString(), movie.Rating.ToString(), movie.Trailers.ToString(), movie.AVS.ToString(), movie.CreatedTime, releasedInTheaters);
                 }
                 else
                 {
-                    movieCSV = string.Format("\"{0}\",\"{1}\",{2},\"{3}\",{4},\"{5}\",\"{6}\"", movie.Name, movie.Path, movie.Size, movie.Quality.ToString(), movie.Trailers.ToString(), movie.CreatedTime, releasedInTheaters);
+                    movieCSV = string.Format(
+                        "\"{0}\",\"{1}\",{2},\"{3}\",\"{4}\",{5},\"{6}\",\"{7}\",\"{8}\"",
+                        movie.Name, movie.Path, movie.Size, movie.Quality.ToString(), movie.Rating.ToString(), movie.Trailers.ToString(), movie.AVS.ToString(), movie.CreatedTime, releasedInTheaters);
                 }
                 file.WriteLine(movieCSV);
 
@@ -456,7 +601,7 @@ namespace MovieInfo
                 bool skip = false;
                 foreach (string ignore in ignores)
                 {
-                    if (subdir.FullName.Contains(ignore))
+                    if (subdir.Name.Contains(ignore))
                     {
                         skip = true;
                         break;
@@ -464,8 +609,8 @@ namespace MovieInfo
                 }
                 if (skip)
                 {
-                    System.Console.Out.Write("Ignored ");
-                    System.Console.Out.WriteLine(subdir.FullName);
+                    //System.Console.Out.Write("Ignored ");
+                    //System.Console.Out.WriteLine(subdir.FullName);
                     continue;
                 }
 
@@ -507,6 +652,25 @@ namespace MovieInfo
                             }
                         }
 
+                        // Do we have MBMovie.json?
+                        if (dir.GetFiles("MBMovie.json").Length == 1)
+                        {
+                            match.hasJson = true;
+                        }
+                        else
+                        {
+                            System.Console.Out.Write("??? Could not find MBMovie.json in ");
+                            System.Console.Out.WriteLine(dir.FullName);
+                        }
+
+                        // Sanity check the MPAA rating
+                        if ((match.Rating == Movie.MpaaRating.Unknown) && !string.IsNullOrEmpty(match.RatingString))
+                        {
+                            System.Console.Out.WriteLine(string.Format(
+                                "??? Can't determine movie rating from rating string \"{0}\" in {1}",
+                                match.RatingString, match.Path));
+                        }
+
                         // Done
                         movies.Add(match);
                         return;
@@ -519,8 +683,12 @@ namespace MovieInfo
             }
             else
             {
-                System.Console.Out.Write("Ignored ");
-                System.Console.Out.WriteLine(dir.FullName);
+                // Only warn on folders that are not obviously a collection
+                if (!dir.Name.Contains("Collection"))
+                {
+                    System.Console.Out.Write("Ignored ");
+                    System.Console.Out.WriteLine(dir.FullName);
+                }
             }
         }
 
