@@ -3,10 +3,6 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
 
-// I totally just rip off their sample code
-using DirectShowLib;
-using System.Runtime.InteropServices;
-
 namespace MovieInfo
 {
     /// <summary>
@@ -75,46 +71,13 @@ namespace MovieInfo
         }
 
         /// <summary>
-        /// The width of the video frame (if it can be determined)
-        /// </summary>
-        public int Width
-        {
-            get
-            {
-                if (!haveAttributes)
-                {
-                    GetAttributes();
-                }
-                return width;
-            }
-        }
-
-        /// <summary>
-        /// The height of the video frame (if it can be determined)
-        /// </summary>
-        public int Height
-        {
-            get
-            {
-                if (!haveAttributes)
-                {
-                    GetAttributes();
-                }
-                return height;
-            }
-        }
-
-        /// <summary>
         /// Get the video quality
         /// </summary>
         public VideoQuality Quality
         {
             get
             {
-                // Try and grab it from the filename
-                // (I usually specify it, and aspect ratio detection is all
-                // sorts of borked on SD movies, because this plugin gets the
-                // NATIVE pixel resolution, not display resolution.)
+                // Try and grab movie quality from the filename
                 if (hd1080.IsMatch(Path))
                 {
                     return VideoQuality.HD_1080;
@@ -131,40 +94,8 @@ namespace MovieInfo
                 {
                     return VideoQuality.SD_Fullscreen;
                 }
-
-                // Have we read attributes?
-                else if (haveAttributes)
-                {
-                    // Use the attributes to figure it out the hard way
-                    if ((Width == 0) || (Height == 0))
-                    {
-                        return VideoQuality.Unknown;
-                    }
-                    else if (Width > 1888)
-                    {
-                        return VideoQuality.HD_1080;
-                    }
-                    else if (Width > 1248)
-                    {
-                        return VideoQuality.HD_720;
-                    }
-                    else
-                    {
-                        double aspectRatio = (double)Width / (double)Height;
-                        if (aspectRatio >= 1.6)                                 // 16:10 or wider
-                        {
-                            return VideoQuality.SD_Widescreen;
-                        }
-                        else
-                        {
-                            return VideoQuality.SD_Fullscreen;
-                        }
-                    }
-                }
                 else
                 {
-                    // We couldn't parse it from the name, and we haven't read
-                    // attributes, so we don't know.
                     return VideoQuality.Unknown;
                 }
             }
@@ -349,31 +280,6 @@ namespace MovieInfo
         /// Does the movie appear to have a MBMovie.json file?
         /// </summary>
         public bool hasJson = false;
-
-        /// <summary>
-        /// Do we have the movie attributes yet?
-        /// </summary>
-        private bool haveAttributes = false;
-
-        // Holds the attributes of the movie, if we read them
-        private int width;
-        private int height;
-
-        /// <summary>
-        /// Open the video file and get attributes (like width and height).
-        /// Warning: this can be SLOW.
-        /// </summary>
-        public void GetAttributes()
-        {
-            if (haveAttributes)
-            {
-                // Nothing to do
-                return;
-            }
-
-            Program.GetMovieAttributes(Path, out width, out height);
-            haveAttributes = true;
-        }
     }
 
     class Program
@@ -414,7 +320,6 @@ namespace MovieInfo
             // Allowable time drift (hours)
             int allowedTimeError = 4;
             bool fixFileTimesWithinError = true;
-            bool readAttributes = false;
 
             // Match the movie folders (things like "I'm A Moive! (2006) [tmdbid=3283]"
             Regex parserBetter = new Regex(@"(^.+\((TV\s*)?\d{4}\)).*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
@@ -433,34 +338,6 @@ namespace MovieInfo
             Console.WriteLine("Reading movie directory " + movieDir.FullName + "...");
             ParseDirectory(movieDir, ref parserBetter, ref ignores, ref movies);
             Console.WriteLine("Completed reading movie directory.");
-            Console.WriteLine();
-
-            // Do we want the width and height?
-            Console.WriteLine("Do you want to read the width & height of each movie?");
-            Console.WriteLine("-- This is very slow! --");
-            Console.Write("Read attributes (Y/N)? [");
-            Console.Write(readAttributes ? "Y" : "N");
-            Console.Write("] ");
-            do
-            {
-                ConsoleKeyInfo keyPressed = Console.ReadKey(true);              // Don't show the key press
-                if (keyPressed.Key == ConsoleKey.Y)
-                {
-                    readAttributes = true;
-                    break;
-                }
-                else if (keyPressed.Key == ConsoleKey.N)
-                {
-                    readAttributes = false;
-                    break;
-                }
-                else if (keyPressed.Key == ConsoleKey.Enter)
-                {
-                    // Leave default
-                    break;
-                }
-            } while (true);
-            Console.WriteLine();
             Console.WriteLine();
 
             // Do we want to fix time error?
@@ -494,9 +371,7 @@ namespace MovieInfo
 
             // Make a new csv
             StreamWriter file = new StreamWriter("C:\\Users\\DAVe\\Google Drive\\Movie List\\movies " + DateTime.Now.ToShortDateString() + ".csv");
-            file.WriteLine("\"Name\",\"Path\",\"Size\"," +
-                (readAttributes ? "\"Width\",\"Height\"," : string.Empty) +
-                "\"Quality\",\"Rating\",\"Trailers\",\"AVS\",\"Added to Library\",\"Released in Theaters\"");
+            file.WriteLine("\"Name\",\"Path\",\"Size\",\"Quality\",\"Rating\",\"Trailers\",\"AVS\",\"Added to Library\",\"Released in Theaters\"");
             // Tip: try setting the Size column's number format to:
             // [>1000000000]0.00,,," GB";[>1000000]0.00,," MB";0.00," KB"
             // or since most movies are ≫ 1 MB
@@ -549,19 +424,9 @@ namespace MovieInfo
                 }
 
                 // Write the CSV line
-                string movieCSV;
-                if (readAttributes)
-                {
-                    movieCSV = string.Format(
-                        "\"{0}\",\"{1}\",{2},{3},{4},\"{5}\",\"{6}\",{7},\"{8}\",\"{9}\",\"{10}\"",
-                        movie.Name, movie.Path, movie.Size, movie.Width, movie.Height, movie.Quality.ToString(), movie.Rating.ToString(), movie.Trailers.ToString(), movie.AVS.ToString(), movie.CreatedTime, releasedInTheaters);
-                }
-                else
-                {
-                    movieCSV = string.Format(
-                        "\"{0}\",\"{1}\",{2},\"{3}\",\"{4}\",{5},\"{6}\",\"{7}\",\"{8}\"",
-                        movie.Name, movie.Path, movie.Size, movie.Quality.ToString(), movie.Rating.ToString(), movie.Trailers.ToString(), movie.AVS.ToString(), movie.CreatedTime, releasedInTheaters);
-                }
+                string movieCSV = string.Format(
+                    "\"{0}\",\"{1}\",{2},\"{3}\",\"{4}\",{5},\"{6}\",\"{7}\",\"{8}\"",
+                    movie.Name, movie.Path, movie.Size, movie.Quality.ToString(), movie.Rating.ToString(), movie.Trailers.ToString(), movie.AVS.ToString(), movie.CreatedTime, releasedInTheaters);
                 file.WriteLine(movieCSV);
 
                 // See if it is new
@@ -689,139 +554,6 @@ namespace MovieInfo
                     System.Console.Out.Write("Ignored ");
                     System.Console.Out.WriteLine(dir.FullName);
                 }
-            }
-        }
-
-        /// <summary>
-        /// Gets the movie height/width
-        /// </summary>
-        public static void GetMovieAttributes(string path, out int width, out int height)
-        {
-            // Initialize out parameters
-            width = 0;
-            height = 0;
-
-            // Get movie metadata
-            // (this is ripped right out of one of the DirectShowLib samples, because I am lazy)
-            IFilterGraph2 m_FilterGraph = new FilterGraph() as IFilterGraph2;
-            ICaptureGraphBuilder2 icgb2 = new CaptureGraphBuilder2() as ICaptureGraphBuilder2;
-            try
-            {
-                // Link the ICaptureGraphBuilder2 to the IFilterGraph2
-                int hr = icgb2.SetFiltergraph(m_FilterGraph);
-                DsError.ThrowExceptionForHR(hr);
-
-                // Add the filters necessary to render the file.  This function will
-                // work with a number of different file types.
-                IBaseFilter sourceFilter = null;
-                hr = m_FilterGraph.AddSourceFilter(path, path, out sourceFilter);
-                DsError.ThrowExceptionForHR(hr);
-
-                // Get the SampleGrabber interface
-                ISampleGrabber m_sampGrabber = (ISampleGrabber)new SampleGrabber();
-                IBaseFilter baseGrabFlt = (IBaseFilter)m_sampGrabber;
-
-                // Configure the Sample Grabber
-                ConfigureSampleGrabber(m_sampGrabber);
-
-                // Add it to the filter
-                hr = m_FilterGraph.AddFilter(baseGrabFlt, "Ds.NET Grabber");
-                DsError.ThrowExceptionForHR(hr);
-
-                // Connect the pieces together, use the default renderer
-                hr = icgb2.RenderStream(null, null, sourceFilter, baseGrabFlt, null);
-                DsError.ThrowExceptionForHR(hr);
-
-                // Get video size
-                GetSize(m_sampGrabber, out width, out height);
-            }
-            catch (Exception ex)
-            {
-                System.Console.Error.Write("Error getting video metadata for ");
-                System.Console.Error.WriteLine(path + ":");
-                System.Console.Error.WriteLine(ex.Message);
-            }
-            finally
-            {
-                // Cleanup COM objects
-                if (icgb2 != null)
-                {
-                    Marshal.ReleaseComObject(icgb2);
-                    icgb2 = null;
-                }
-                if (m_FilterGraph != null)
-                {
-                    Marshal.ReleaseComObject(m_FilterGraph);
-                    m_FilterGraph = null;
-                }
-
-                // I hate this, but if you don't force a garbage
-                // collection, none of the above released objects
-                // actually get released (stupid COM). So, to avoid
-                // horrible memory leaks, and possible DirectShow
-                // object count limits, I force a garbage collect :/
-                GC.Collect();
-            }
-        }
-
-        // Set the options on the sample grabber
-        private static void ConfigureSampleGrabber(ISampleGrabber sampGrabber)
-        {
-            AMMediaType media;
-            int hr;
-
-            // Set the media type to Video/RBG24
-            media = new AMMediaType();
-            media.majorType = MediaType.Video;
-            media.subType = MediaSubType.RGB24;
-            media.formatType = FormatType.VideoInfo;
-            hr = sampGrabber.SetMediaType(media);
-            DsError.ThrowExceptionForHR(hr);
-
-            DsUtils.FreeAMMediaType(media);
-            media = null;
-
-            // Configure the samplegrabber
-            hr = sampGrabber.SetBufferSamples(true);
-            DsError.ThrowExceptionForHR(hr);
-        }
-
-        /// <summary>
-        /// Get the size of the media, if possible
-        /// </summary>
-        /// <param name="sampGrabber">The sample grabber object to use</param>
-        /// <param name="width">The detected width (if any)</param>
-        /// <param name="height">The detected height (if any)</param>
-        private static void GetSize(ISampleGrabber sampGrabber, out int width, out int height)
-        {
-            // Initialize out values to 0 in case try fails
-            width = 0;
-            height = 0;
-
-            // Get the media type from the SampleGrabber
-            AMMediaType media = new AMMediaType();
-            int hr = sampGrabber.GetConnectedMediaType(media);
-            DsError.ThrowExceptionForHR(hr);
-
-            try
-            {
-                if ((media.formatType != FormatType.VideoInfo) || (media.formatPtr == IntPtr.Zero))
-                {
-                    throw new NotSupportedException("Unknown Grabber Media Format");
-                }
-
-                // Get the struct
-                VideoInfoHeader videoInfoHeader = new VideoInfoHeader();
-                Marshal.PtrToStructure(media.formatPtr, videoInfoHeader);
-
-                // Grab the size info
-                width = videoInfoHeader.BmiHeader.Width;
-                height = videoInfoHeader.BmiHeader.Height;
-            }
-            finally
-            {
-                DsUtils.FreeAMMediaType(media);
-                media = null;
             }
         }
     }
