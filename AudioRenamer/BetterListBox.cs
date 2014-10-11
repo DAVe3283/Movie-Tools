@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Based on nobugz post here: https://social.msdn.microsoft.com/Forums/en-US/46d8cba4-1266-4f39-a27b-5e86a4cf3583/listbox-verticle-scroll-bar-event?forum=Vsexpressvcs
+// Modified to support the mouse wheel as well
+
+using System;
 using System.Windows.Forms;
 
 public class BetterListBox : ListBox
