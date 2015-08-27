@@ -277,9 +277,9 @@ namespace MovieInfo
         }
 
         /// <summary>
-        /// Does the movie appear to have a MBMovie.json file?
+        /// Does the movie appear to have a metadata file?
         /// </summary>
-        public bool hasJson = false;
+        public bool hasMetadata = false;
     }
 
     class Program
@@ -291,6 +291,7 @@ namespace MovieInfo
         {
             ".avi",
             ".mkv",
+            ".mov",
             ".mp4",
             ".wmv",
         };
@@ -332,6 +333,7 @@ namespace MovieInfo
                 "From ",
                 "Trailers",
                 "Special Features",
+                "extrafanart",
             };
 
             // Get the moves
@@ -517,14 +519,18 @@ namespace MovieInfo
                             }
                         }
 
-                        // Do we have MBMovie.json?
-                        if (dir.GetFiles("MBMovie.json").Length == 1)
+                        // Do we have metadata?
+                        if (File.Exists(Path.ChangeExtension(movie.FullName,".nfo"))) // Emby (Media Browser 3)
                         {
-                            match.hasJson = true;
+                            match.hasMetadata = true;
+                        }
+                        else if (dir.GetFiles("MBMovie.json").Length == 1) // Media Browser 2
+                        {
+                            match.hasMetadata = true;
                         }
                         else
                         {
-                            System.Console.Out.Write("??? Could not find MBMovie.json in ");
+                            System.Console.Out.Write("??? Could not find metadata (.nfo or MBMovie.json) in ");
                             System.Console.Out.WriteLine(dir.FullName);
                         }
 
