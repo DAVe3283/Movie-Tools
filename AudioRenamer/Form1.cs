@@ -37,7 +37,7 @@ namespace AudioRenamer
         /// <summary>
         /// Match an audio file
         /// </summary>
-        private static Regex AudioFile = new Regex(@"^F\d+_(T\d+)_Audio\s+\-\s+(.*)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static Regex AudioFile = new Regex(@"^(.+_)?F\d+_(T\d+)_Audio\s+\-\s+(.*)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         /// <summary>
         /// Known audio formats, and their nice names
@@ -47,6 +47,7 @@ namespace AudioRenamer
             { ".dts", "DTS" },
             { ".dtshd", "DTS-HD" },
             { ".ac3", "AC3" },
+            { ".eac3", "E-AC3" },
             { ".mp4", "AAC" },
             { ".m4a", "AAC" },
             { ".thd", "TrueHD" },
@@ -167,8 +168,8 @@ namespace AudioRenamer
             if (audioMatch.Success)
             {
                 // We can make a fancy new name!
-                string trackNo = audioMatch.Groups[1].Value;
-                string mainName = audioMatch.Groups[2].Value;
+                string trackNo = audioMatch.Groups[2].Value;
+                string mainName = audioMatch.Groups[3].Value;
 
                 newName = trackNo + " " + mainName;
             }

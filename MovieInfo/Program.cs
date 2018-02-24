@@ -78,7 +78,11 @@ namespace MovieInfo
             get
             {
                 // Try and grab movie quality from the filename
-                if (hd1080.IsMatch(Path))
+                if (uhd4k.IsMatch(Path))
+                {
+                    return VideoQuality.UHD_4k;
+                }
+                else if (hd1080.IsMatch(Path))
                 {
                     return VideoQuality.HD_1080;
                 }
@@ -102,8 +106,9 @@ namespace MovieInfo
         }
 
         // Match video quality in filenames like "The Shawshank Redemption (1994) [R] HD 1080p.mkv"
-        private static Regex hd1080 = new Regex(@".*\bHD\s+1080[pi]\b.*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static Regex hd720 = new Regex(@".*\bHD\s+720[pi]\b.*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex uhd4k = new Regex(@".*\b4k(\d+[pi]?)?( UHD)?\b.*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex hd1080 = new Regex(@".*\bHD 1080[pi]\b.*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex hd720 = new Regex(@".*\bHD 720[pi]\b.*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static Regex sdWidescreen = new Regex(@".*\bWidescreen\b.*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static Regex sdFullscreen = new Regex(@".*\bFullscreen\b.*", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -128,14 +133,19 @@ namespace MovieInfo
             SD_Widescreen,
 
             /// <summary>
-            /// High Definition (Blu-Ray), 720p/i
+            /// High Definition (Blu-ray), 720p/i
             /// </summary>
             HD_720,
 
             /// <summary>
-            /// High Definition (Blu-Ray), 1080p/i
+            /// High Definition (Blu-ray), 1080p/i
             /// </summary>
             HD_1080,
+
+            /// <summary>
+            /// Ultra High Definition (Blu-ray), 4k
+            /// </summary>
+            UHD_4k,
         }
 
         /// <summary>
@@ -263,6 +273,11 @@ namespace MovieInfo
         /// </summary>
         public int Trailers = 0;
 
+        /// <summary>
+        /// The number of extras a movie appears to have
+        /// </summary>
+        public int Extras = 0;
+
         private static Regex hasAVS = new Regex(@"\[AVS\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         /// <summary>
@@ -330,10 +345,9 @@ namespace MovieInfo
             List<Movie> movies = new List<Movie>();                             // Holds the matched movies
             string[] ignores =                                                  // A list of folders to ignore
             {
-                "From ",
+                "Backdrops",
+                "Extras",
                 "Trailers",
-                "Special Features",
-                "extrafanart",
             };
 
             // Get the moves
@@ -372,8 +386,8 @@ namespace MovieInfo
             Console.WriteLine();
 
             // Make a new csv
-            StreamWriter file = new StreamWriter("C:\\Users\\DAVe\\Google Drive\\Movie List\\movies " + DateTime.Now.ToShortDateString() + ".csv");
-            file.WriteLine("\"Name\",\"Path\",\"Size\",\"Quality\",\"Rating\",\"Trailers\",\"AVS\",\"Added to Library\",\"Released in Theaters\"");
+            StreamWriter file = new StreamWriter("C:\\Users\\DAVe3283\\Google Drive\\Movie List\\movies " + DateTime.Now.ToShortDateString() + ".csv");
+            file.WriteLine("\"Name\",\"Path\",\"Size\",\"Quality\",\"Rating\",\"Trailers\",\"Extras\",\"AVS\",\"Added to Library\",\"Released in Theaters\"");
             // Tip: try setting the Size column's number format to:
             // [>1000000000]0.00,,," GB";[>1000000]0.00,," MB";0.00," KB"
             // or since most movies are ≫ 1 MB
@@ -427,8 +441,8 @@ namespace MovieInfo
 
                 // Write the CSV line
                 string movieCSV = string.Format(
-                    "\"{0}\",\"{1}\",{2},\"{3}\",\"{4}\",{5},\"{6}\",\"{7}\",\"{8}\"",
-                    movie.Name, movie.Path, movie.Size, movie.Quality.ToString(), movie.Rating.ToString(), movie.Trailers.ToString(), movie.AVS.ToString(), movie.CreatedTime, releasedInTheaters);
+                    "\"{0}\",\"{1}\",{2},\"{3}\",\"{4}\",{5},{6},\"{7}\",\"{8}\",\"{9}\"",
+                    movie.Name, movie.Path, movie.Size, movie.Quality.ToString(), movie.Rating.ToString(), movie.Trailers.ToString(), movie.Extras.ToString(), movie.AVS.ToString(), movie.CreatedTime, releasedInTheaters);
                 file.WriteLine(movieCSV);
 
                 // See if it is new
@@ -448,9 +462,12 @@ namespace MovieInfo
             Console.Out.WriteLine("Found " + movies.Count.ToString() + " movies.");
             Console.Out.WriteLine(addedSinceStartTime.ToString() + " movie(s) added since " + startTime.ToString());
             Console.Out.WriteLine(timeErrors + " movie(s) " + (fixFileTimesWithinError ? "had" : "have") + " time errors that were " + (fixFileTimesWithinError ? string.Empty : "NOT ") + "fixed.");
+            Console.Out.WriteLine(legacyMeta + " movie(s) have legacy metadata.");
             Console.Out.WriteLine("Press any key to quit.");
             Console.ReadKey();
         }
+
+        public static UInt32 legacyMeta = 0;
 
         /// <summary>
         /// Parses a directory to get the movies in that directory
@@ -501,19 +518,33 @@ namespace MovieInfo
                         match.Name = name;
                         match.File = movie;
 
-                        // Do we have trailers?
-                        foreach (DirectoryInfo trailers in dir.GetDirectories())
+                        // Do we have extras & trailers?
+                        foreach (DirectoryInfo subdir in dir.GetDirectories())
                         {
                             // Look for a Trailers subdirectory
-                            if (trailers.Name.Equals("Trailers", StringComparison.InvariantCultureIgnoreCase))
+                            if (subdir.Name.Equals("Trailers", StringComparison.InvariantCultureIgnoreCase))
                             {
                                 // Find movie files
-                                foreach (FileInfo trailer in trailers.GetFiles())
+                                foreach (FileInfo trailer in subdir.GetFiles())
                                 {
                                     if (hasValidExtension(trailer.Name))
                                     {
                                         // We got a trailer!
                                         match.Trailers++;
+                                    }
+                                }
+                            }
+
+                            // Look for a Extras subdirectory
+                            if (subdir.Name.Equals("Extras", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                // Find movie files
+                                foreach (FileInfo extra in subdir.GetFiles())
+                                {
+                                    if (hasValidExtension(extra.Name))
+                                    {
+                                        // We got an extra!
+                                        match.Extras++;
                                     }
                                 }
                             }
@@ -524,14 +555,22 @@ namespace MovieInfo
                         {
                             match.hasMetadata = true;
                         }
-                        else if (dir.GetFiles("MBMovie.json").Length == 1) // Media Browser 2
-                        {
-                            match.hasMetadata = true;
-                        }
+                        //else if (dir.GetFiles("MBMovie.json").Length == 1) // Media Browser 2
+                        //{
+                        //    match.hasMetadata = true;
+                        //}
                         else
                         {
                             System.Console.Out.Write("??? Could not find metadata (.nfo or MBMovie.json) in ");
                             System.Console.Out.WriteLine(dir.FullName);
+                        }
+
+                        // Legacy metadata
+                        if (dir.GetFiles("MBMovie.json").Length == 1) // Media Browser 2
+                        {
+                            System.Console.Out.Write("Legacy metadata found in ");
+                            System.Console.Out.WriteLine(dir.FullName);
+                            ++legacyMeta;
                         }
 
                         // Sanity check the MPAA rating
