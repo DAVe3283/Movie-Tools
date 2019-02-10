@@ -81,10 +81,15 @@
             // 
             this.numericUpDownMinutes.Location = new System.Drawing.Point(110, 12);
             this.numericUpDownMinutes.Maximum = new decimal(new int[] {
-            999,
+            240,
             0,
             0,
             0});
+            this.numericUpDownMinutes.Minimum = new decimal(new int[] {
+            1,
+            0,
+            0,
+            -2147483648});
             this.numericUpDownMinutes.Name = "numericUpDownMinutes";
             this.numericUpDownMinutes.Size = new System.Drawing.Size(40, 20);
             this.numericUpDownMinutes.TabIndex = 2;
@@ -96,10 +101,15 @@
             // 
             this.numericUpDownSeconds.Location = new System.Drawing.Point(156, 12);
             this.numericUpDownSeconds.Maximum = new decimal(new int[] {
-            999,
+            14400,
             0,
             0,
             0});
+            this.numericUpDownSeconds.Minimum = new decimal(new int[] {
+            1,
+            0,
+            0,
+            -2147483648});
             this.numericUpDownSeconds.Name = "numericUpDownSeconds";
             this.numericUpDownSeconds.Size = new System.Drawing.Size(40, 20);
             this.numericUpDownSeconds.TabIndex = 3;

@@ -75,6 +75,18 @@ namespace AudioRenamer
                 numericUpDownHours.Value++;
                 numericUpDownMinutes.Value -= 60;
             }
+            while (numericUpDownMinutes.Value < 0)
+            {
+                if (numericUpDownHours.Value > 0)
+                {
+                    numericUpDownHours.Value--;
+                    numericUpDownMinutes.Value += 60;
+                }
+                else
+                {
+                    numericUpDownMinutes.Value = 0;
+                }
+            }
 
             // Update total
             numericUpDown_ValueChanged(sender, e);
@@ -86,6 +98,18 @@ namespace AudioRenamer
             {
                 numericUpDownMinutes.Value++;
                 numericUpDownSeconds.Value -= 60;
+            }
+            while (numericUpDownSeconds.Value < 0)
+            {
+                if ((numericUpDownMinutes.Value > 0) || (numericUpDownHours.Value > 0))
+                {
+                    numericUpDownMinutes.Value--;
+                    numericUpDownSeconds.Value += 60;
+                }
+                else
+                {
+                    numericUpDownSeconds.Value = 0;
+                }
             }
 
             // Update total
