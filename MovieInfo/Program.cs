@@ -346,8 +346,9 @@ namespace MovieInfo
             string[] ignores =                                                  // A list of folders to ignore
             {
                 "Backdrops",
-                "Extras",
+                "Subtitles",
                 "Trailers",
+                "Extras",
             };
 
             // Get the moves
@@ -507,6 +508,7 @@ namespace MovieInfo
             {
                 // We have a movie directory
                 string name = dirName.Groups[1].Value;
+                bool gotMovie = false;
 
                 // Get the actual file
                 foreach (FileInfo movie in dir.GetFiles())
@@ -555,10 +557,6 @@ namespace MovieInfo
                         {
                             match.hasMetadata = true;
                         }
-                        //else if (dir.GetFiles("MBMovie.json").Length == 1) // Media Browser 2
-                        //{
-                        //    match.hasMetadata = true;
-                        //}
                         else
                         {
                             System.Console.Out.Write("??? Could not find metadata (.nfo or MBMovie.json) in ");
@@ -583,13 +581,16 @@ namespace MovieInfo
 
                         // Done
                         movies.Add(match);
-                        return;
+                        gotMovie = true;
                     }
                 }
 
-                // Failure
-                System.Console.Out.Write("!!! Could not find movie in ");
-                System.Console.Out.WriteLine(dir.FullName);
+                if (!gotMovie)
+                {
+                    // Failure
+                    System.Console.Out.Write("!!! Could not find movie in ");
+                    System.Console.Out.WriteLine(dir.FullName);
+                }
             }
             else
             {
